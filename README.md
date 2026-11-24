@@ -158,11 +158,3 @@ L’étape Push n’est pas passée : `docker login` n’arrivait pas à joindre
 
 ![Erreur push](captures/32_jenkins_push_timeout_docker_hub.jpg)
 ![Builds du job](captures/33_jenkins_job_builds.jpg)
-
-## Remarques
-
-* Dans le dépôt les dossiers s’appellent `Server` et `Client` avec une majuscule. La commande du TP `docker build -t mern-server ./server` marche sur Mac car le système ne fait pas la différence entre majuscules et minuscules. Dans `docker-compose.yml` j’ai écrit `./Server` et `./Client` pour que ça marche aussi sous Linux.
-* L’énoncé donne `docker build -t mern-server ./client` pour le client : j’ai utilisé le nom `mern-client` demandé juste au dessus. De même `docker compose up -- build` s’écrit `docker compose up --build`.
-* Le serveur du dépôt ne se connectait pas encore à MongoDB. Comme le conseille l’énoncé, j’ai ajouté la connexion avec `mongoose` et la variable `MONGO_URI` dans `Server/src/index.mjs`, plus une route `/api/db` pour vérifier la connexion.
-* Le dossier `node_modules` n’est pas copié dans les images grâce au fichier `.dockerignore` : les dépendances sont installées par `npm install` dans le conteneur.
-* Trivy trouve surtout des failles dans les paquets npm (node-pkg) : 1 CRITICAL côté serveur et 28 HIGH côté client. J’ai mis `--exit-code 0` pour que le scan affiche le rapport sans bloquer le pipeline, comme dans le TP précédent.
