@@ -1,0 +1,38 @@
+services:
+  # Base de données MongoDB
+  mongodb:
+    image: mongo
+    container_name: mongodb
+    networks:
+      - mern-network
+
+  # API Express (dossier Server)
+  server:
+    build: ./Server
+    image: mern-server
+    container_name: server
+    ports:
+      - "9000:9000"
+    networks:
+      - mern-network
+    depends_on:
+      - mongodb
+    environment:
+      # "mongodb" est le nom du service : il sert de nom d'hôte dans le réseau
+      - MONGO_URI=mongodb://mongodb:27017/mern
+
+  # Application React (dossier Client)
+  client:
+    build: ./Client
+    image: mern-client
+    container_name: client
+    ports:
+      - "3000:3000"
+    networks:
+      - mern-network
+    depends_on:
+      - server
+
+networks:
+  mern-network:
+    driver: bridge
