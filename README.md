@@ -16,6 +16,7 @@ Environnement : macOS, Docker Desktop (Docker 29.9.3, Docker Compose v5.7.0).
 | `Client/Dockerfile` | Image du client React (`mern-client`) |
 | `docker-compose.yml` | Lance MongoDB, le serveur et le client ensemble |
 | `Server/.dockerignore`, `Client/.dockerignore` | Fichiers à ne pas copier dans les images (node_modules) |
+| `Jenkinsfile` | Pipeline Jenkins : build des images, scan Trivy, push sur Docker Hub |
 | `captures/` | Captures d’écran de chaque étape |
 
 ## 1. Cloner le projet
@@ -115,9 +116,53 @@ docker compose up --build
 
 Pour arrêter : `docker compose down`.
 
+## 7. Images et conteneurs du TP
+
+Les images du TP : `mern-server` et `mern-client` (construites par Compose), `ahmedbouabid/mern-server` et `ahmedbouabid/mern-client` (construites par Jenkins pour Docker Hub), plus les images de base `mongo`, `node:lts-alpine` et `aquasec/trivy`.
+
+```bash
+docker images
+docker ps -a
+docker compose ps
+docker network ls
+```
+
+![Images Docker](captures/20_docker_images_tp4.jpg)
+![Conteneurs et réseau](captures/21_docker_conteneurs_reseau_tp4.jpg)
+
+La même chose dans Docker Desktop : les 3 conteneurs du projet Compose (mongodb, server sur 9000, client sur 3000) et les images filtrées avec « mern ».
+
+![Docker Desktop conteneurs](captures/22_docker_desktop_conteneurs.jpg)
+![Docker Desktop images](captures/23_docker_desktop_images.jpg)
+
+## 8. Pipeline Jenkins
+
+J’ai repris le Jenkinsfile du TP précédent et je l’ai adapté au projet MERN. Le pipeline récupère le code depuis GitHub, construit les deux images, les scanne avec Trivy puis les pousse sur Docker Hub.
+
+![Jenkinsfile](captures/24_jenkinsfile.jpg)
+
+Configuration dans Jenkins : les identifiants Docker Hub sont enregistrés sous l’id `dockerhub-creds`, le job `TP4_MERN_Docker` est de type Pipeline, il vérifie le dépôt toutes les 5 minutes (Poll SCM `H/5 * * * *`) et lit le Jenkinsfile de la branche `main`.
+
+![Credentials Docker Hub](captures/25_jenkins_credentials_dockerhub.jpg)
+![Poll SCM](captures/26_jenkins_job_poll_scm.jpg)
+![Pipeline from SCM](captures/27_jenkins_pipeline_from_scm.jpg)
+![Branche et Jenkinsfile](captures/28_jenkins_branche_jenkinsfile.jpg)
+
+Résultat du build : les étapes Checkout, Build Server Image, Build Client Image, Scan Server Image et Scan Client Image passent.
+
+![Étapes du pipeline](captures/29_jenkins_pipeline_etapes.jpg)
+![Résultats Trivy](captures/30_jenkins_resultats_trivy.jpg)
+![Détail du scan](captures/31_jenkins_detail_scan_trivy.jpg)
+
+L’étape Push n’est pas passée : `docker login` n’arrivait pas à joindre `auth.docker.io` (Client.Timeout). C’est un problème de connexion réseau au moment du TP et pas une erreur dans le Jenkinsfile : j’ai relancé le build (#2) et la même erreur est revenue, et un `curl` vers `auth.docker.io` depuis mon Mac ne répondait pas non plus.
+
+![Erreur push](captures/32_jenkins_push_timeout_docker_hub.jpg)
+![Builds du job](captures/33_jenkins_job_builds.jpg)
+
 ## Remarques
 
 * Dans le dépôt les dossiers s’appellent `Server` et `Client` avec une majuscule. La commande du TP `docker build -t mern-server ./server` marche sur Mac car le système ne fait pas la différence entre majuscules et minuscules. Dans `docker-compose.yml` j’ai écrit `./Server` et `./Client` pour que ça marche aussi sous Linux.
 * L’énoncé donne `docker build -t mern-server ./client` pour le client : j’ai utilisé le nom `mern-client` demandé juste au dessus. De même `docker compose up -- build` s’écrit `docker compose up --build`.
 * Le serveur du dépôt ne se connectait pas encore à MongoDB. Comme le conseille l’énoncé, j’ai ajouté la connexion avec `mongoose` et la variable `MONGO_URI` dans `Server/src/index.mjs`, plus une route `/api/db` pour vérifier la connexion.
 * Le dossier `node_modules` n’est pas copié dans les images grâce au fichier `.dockerignore` : les dépendances sont installées par `npm install` dans le conteneur.
+* Trivy trouve surtout des failles dans les paquets npm (node-pkg) : 1 CRITICAL côté serveur et 28 HIGH côté client. J’ai mis `--exit-code 0` pour que le scan affiche le rapport sans bloquer le pipeline, comme dans le TP précédent.
